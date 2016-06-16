@@ -1,6 +1,7 @@
 import re, math, collections, itertools
 import nltk, nltk.classify.util, nltk.metrics
 from nltk.classify import NaiveBayesClassifier
+import csv
 
 def is_url(texto):
   ocorrencias = re.findall('http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', texto)
@@ -59,62 +60,77 @@ def is_emoticon(palavra):
 
   return 0
 
-def evaluate_features(feature_select):
-  #reading pre-labeled input and splitting into lines
-  posSentences = open('polarityData\\rt-polaritydata\\rt-polarity-pos.txt', 'r')
-  negSentences = open('polarityData\\rt-polaritydata\\rt-polarity-neg.txt', 'r')
-  posSentences = re.split(r'\n', posSentences.read())
-  negSentences = re.split(r'\n', negSentences.read())
-
-  posFeatures = []
-  negFeatures = []
-  #http://stackoverflow.com/questions/367155/splitting-a-string-into-words-and-punctuation
-  #breaks up the sentences into lists of individual words (as selected by the input mechanism) and appends 'pos' or 'neg' after each list
-  for i in posSentences:
-    posWords = re.findall(r"[\w']+|[.,!?;]", i)
-    posWords = [feature_select(posWords), 'pos']
-    posFeatures.append(posWords)
-  for i in negSentences:
-    negWords = re.findall(r"[\w']+|[.,!?;]", i)
-    negWords = [feature_select(negWords), 'neg']
-    negFeatures.append(negWords)
-
 def make_full_dict(words):
   return dict([(word, True) for word in words])
+
+def pre_processa_texto(texto):
+  novo_texto = []
+
+  for palavra in texto.split(" "):
+    palavra = remove_pontuacao(palavra).strip()
+
+    if len(palavra) < 1:
+      continue
+
+    if palavra[0] == "@":
+      continue
+
+    if is_url(palavra) or is_emoticon(palavra) or is_emoji(palavra):
+      continue
+
+    novo_texto.append(palavra)
+
+  return " ".join(novo_texto)
+
+tweets_negativos = []
+tweets_positivos = []
 
 with open("treinamento.csv", "r") as f:
   dicionario = []
 
-  for line in f:
-    campos = line.split(",")
-    texto = campos[5]
+  leitor = csv.reader(f, delimiter=',', quotechar='"')
 
-    palavras = texto.split(" ")
+  for line in leitor:
+    texto = line[5]
+    polaridade = line[6]
 
-    for palavra in palavras:
-      palavra = remove_pontuacao(palavra).strip()
+    texto = pre_processa_texto(texto)
 
-      if len(palavra) < 1:
-        continue
+    if polaridade == "-1":
+      tweets_negativos.append(texto)
+    else:
+      tweets_positivos.append(texto)
 
-      if palavra[0] == "@":
-        continue
+posFeatures = []
+negFeatures = []
+#http://stackoverflow.com/questions/367155/splitting-a-string-into-words-and-punctuation
+#breaks up the sentences into lists of individual words (as selected by the input mechanism) and appends 'pos' or 'neg' after each list
+for i in tweets_positivos:
+  posWords = re.findall(r"[\w']+|[.,!?;]", i)
+  posWords = [make_full_dict(posWords), 'pos']
+  posFeatures.append(posWords)
+for i in tweets_negativos:
+  negWords = re.findall(r"[\w']+|[.,!?;]", i)
+  negWords = [make_full_dict(negWords), 'neg']
+  negFeatures.append(negWords)
 
-      if is_url(palavra):
-        continue
+#selects 3/4 of the features to be used for training and 1/4 to be used for testing
+posCutoff = int(math.floor(len(posFeatures)*3/4))
+negCutoff = int(math.floor(len(negFeatures)*3/4))
+trainFeatures = posFeatures[:posCutoff] + negFeatures[:negCutoff]
+testFeatures = posFeatures[posCutoff:] + negFeatures[negCutoff:]
 
-      palavra = " !".join(palavra.split("!"))
+classifier = NaiveBayesClassifier.train(trainFeatures)
 
-      palavra = palavra.split(" ")
+#initiates referenceSets and testSets
+referenceSets = collections.defaultdict(set)
+testSets = collections.defaultdict(set)
 
-      if len(palavra) > 1:
-        for subpalavra in palavra:
-          dicionario.append(subpalavra)
-      else:
-        dicionario.append(palavra)
-
-print 'using all words as features'
-evaluate_features(make_full_dict)
+#puts correctly labeled sentences in referenceSets and the predictively labeled version in testsets
+for i, (features, label) in enumerate(testFeatures):
+  referenceSets[label].add(i)
+  predicted = classifier.classify(features)
+  testSets[predicted].add(i)
 
 print 'train on %d instances, test on %d instances' % (len(trainFeatures), len(testFeatures))
 print 'accuracy:', nltk.classify.util.accuracy(classifier, testFeatures)
