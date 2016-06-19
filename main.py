@@ -1,10 +1,18 @@
+# coding=utf-8
+
+import sys
 import re, math, collections, itertools
-import nltk, nltk.classify.util, nltk.metrics
+import nltk, nltk.classify.util
+from nltk.metrics import *
 from nltk.classify import NaiveBayesClassifier
 import csv
+import itertools
+from nltk.collocations import BigramCollocationFinder
+from nltk.metrics import BigramAssocMeasures
+import random
 
 def is_url(texto):
-  ocorrencias = re.findall('http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', texto)
+  ocorrencias = re.findall('http[s]?:[/]*(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', texto)
   return len(ocorrencias) > 0
 
 def remove_pontuacao(palavra):
@@ -63,6 +71,38 @@ def is_emoticon(palavra):
 def make_full_dict(words):
   return dict([(word, True) for word in words])
 
+def bigram_word_feats(words, score_fn=BigramAssocMeasures.chi_sq, n=200):
+    bigram_finder = BigramCollocationFinder.from_words(words)
+    bigrams = bigram_finder.nbest(score_fn, n)
+    return dict([(ngram, True) for ngram in itertools.chain(words, bigrams)])
+
+def substitui_abreviacoes_internet(palavra):
+    dic = [
+        ("q", "que"),
+        ("pq", "porque"),
+        ("tbm", "também"),
+        ("tb", "também"),
+        ("d", "de"),
+        ("vc", "você"),
+        ("td", "tudo"),
+        ("cm", "com"),
+        ("msc", "música"),
+        ("cmg", "comigo"),
+        ("s", "sim"),
+        ("si", "sim"),
+        ("naum", "não"),
+        ("n", "não"),
+        ("ñ", "não"),
+        ("facul", "faculdade")
+    ]
+
+    encontrou = [item[1] for item in dic if item[0] == palavra]
+
+    if len(encontrou) == 0:
+        return palavra
+
+    return encontrou[0]
+
 def pre_processa_texto(texto):
   novo_texto = []
 
@@ -78,14 +118,21 @@ def pre_processa_texto(texto):
     if is_url(palavra) or is_emoticon(palavra) or is_emoji(palavra):
       continue
 
-    novo_texto.append(palavra)
+    t = substitui_abreviacoes_internet(palavra)
+
+    novo_texto.append(t)
 
   return " ".join(novo_texto)
 
 tweets_negativos = []
 tweets_positivos = []
 
-with open("treinamento.csv", "r") as f:
+parametros = len(sys.argv)
+
+entradaTreinamento = sys.argv[0]
+entradaTestes = parametros == 1 ? False : sys.argv[0]
+
+with open(entradaTreinamento, "r") as f:
   dicionario = []
 
   leitor = csv.reader(f, delimiter=',', quotechar='"')
@@ -103,18 +150,18 @@ with open("treinamento.csv", "r") as f:
 
 posFeatures = []
 negFeatures = []
-#http://stackoverflow.com/questions/367155/splitting-a-string-into-words-and-punctuation
-#breaks up the sentences into lists of individual words (as selected by the input mechanism) and appends 'pos' or 'neg' after each list
-for i in tweets_positivos:
-  posWords = re.findall(r"[\w']+|[.,!?;]", i)
-  posWords = [make_full_dict(posWords), 'pos']
-  posFeatures.append(posWords)
-for i in tweets_negativos:
-  negWords = re.findall(r"[\w']+|[.,!?;]", i)
-  negWords = [make_full_dict(negWords), 'neg']
-  negFeatures.append(negWords)
 
-#selects 3/4 of the features to be used for training and 1/4 to be used for testing
+for tweet in tweets_positivos:
+  posFeatures.append([make_full_dict(tweet), 'pos'])
+for tweet in tweets_negativos:
+  negFeatures.append([make_full_dict(tweet.split(" ")), 'neg'])
+
+random.shuffle(posFeatures)
+random.shuffle(negFeatures)
+
+if entradaTestes:
+
+else:
 posCutoff = int(math.floor(len(posFeatures)*3/4))
 negCutoff = int(math.floor(len(negFeatures)*3/4))
 trainFeatures = posFeatures[:posCutoff] + negFeatures[:negCutoff]
@@ -133,9 +180,11 @@ for i, (features, label) in enumerate(testFeatures):
   testSets[predicted].add(i)
 
 print 'train on %d instances, test on %d instances' % (len(trainFeatures), len(testFeatures))
-print 'accuracy:', nltk.classify.util.accuracy(classifier, testFeatures)
-print 'pos precision:', nltk.metrics.precision(referenceSets['pos'], testSets['pos'])
-print 'pos recall:', nltk.metrics.recall(referenceSets['pos'], testSets['pos'])
-print 'neg precision:', nltk.metrics.precision(referenceSets['neg'], testSets['neg'])
-print 'neg recall:', nltk.metrics.recall(referenceSets['neg'], testSets['neg'])
+# print 'accuracy:', accuracy(classifier, testFeatures)
+print 'pos precision:', precision(referenceSets['pos'], testSets['pos'])
+print 'pos recall:', recall(referenceSets['pos'], testSets['pos'])
+print 'pos F-measure:', f_measure(referenceSets['pos'], testSets['pos'])
+print 'neg precision:', precision(referenceSets['neg'], testSets['neg'])
+print 'neg recall:', recall(referenceSets['neg'], testSets['neg'])
+print 'neg F-measure:', f_measure(referenceSets['neg'], testSets['neg'])
 classifier.show_most_informative_features(10)
