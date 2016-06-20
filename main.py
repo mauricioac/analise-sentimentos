@@ -11,6 +11,39 @@ from nltk.collocations import BigramCollocationFinder
 from nltk.metrics import BigramAssocMeasures
 import random
 
+def classifica(trainFeatures, testFeatures):
+  classifier = NaiveBayesClassifier.train(trainFeatures)
+
+  #initiates referenceSets and testSets
+  referenceSets = collections.defaultdict(set)
+  testSets = collections.defaultdict(set)
+
+  #puts correctly labeled sentences in referenceSets and the predictively labeled version in testsets
+  for i, (features, label) in enumerate(testFeatures):
+    referenceSets[label].add(i)
+    predicted = classifier.classify(features)
+    testSets[predicted].add(i)
+
+  return {
+    "classifier": classifier,
+    "ref": referenceSets,
+    "test": testSets
+  }
+
+def classifica_arquivo_separado(features_positivas, features_negativas, testes):
+  trainFeatures = features_negativas + features_positivas
+  testFeatures = testes
+
+  return classifica(trainFeatures, testFeatures)
+
+def classifica_mesmo_arquivo(features_positivas, features_negativas):
+  posCutoff = int(math.floor(len(features_positivas)*3/4))
+  negCutoff = int(math.floor(len(features_negativas)*3/4))
+  trainFeatures = features_positivas[:posCutoff] + features_negativas[:negCutoff]
+  testFeatures = features_positivas[posCutoff:] + features_negativas[negCutoff:]
+
+  return classifica(trainFeatures, testFeatures)
+
 def is_url(texto):
   ocorrencias = re.findall('http[s]?:[/]*(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', texto)
   return len(ocorrencias) > 0
@@ -21,6 +54,34 @@ def remove_pontuacao(palavra):
 def is_emoji(palavra):
   ocorrencias = re.findall(':[a-zA-Z]+:', palavra)
   return len(ocorrencias) > 0
+
+def extrai_features(arquivo, campo_texto, campo_classe):
+  with open(arquivo, "r") as f:
+    leitor = csv.reader(f, delimiter=',', quotechar='"')
+
+    for line in leitor:
+      texto = line[campo_texto]
+      polaridade = line[campo_classe]
+
+      texto = pre_processa_texto(texto)
+
+      if polaridade == "-1":
+        tweets_negativos.append(texto)
+      else:
+        tweets_positivos.append(texto)
+
+  posFeatures = []
+  negFeatures = []
+
+  for tweet in tweets_positivos:
+    posFeatures.append([make_full_dict(tweet.split(" ")), 'pos'])
+  for tweet in tweets_negativos:
+    negFeatures.append([make_full_dict(tweet.split(" ")), 'neg'])
+
+  random.shuffle(posFeatures)
+  random.shuffle(negFeatures)
+
+  return (posFeatures, negFeatures)
 
 def is_emoticon(palavra):
   emoticons_pos = [
@@ -55,7 +116,9 @@ def is_emoticon(palavra):
   emoticons_neu = [
     ":|",
     "o.O",
+    "oO",
     "O.o",
+    "Oo",
     ":o",
     ":O"
   ]
@@ -129,57 +192,41 @@ tweets_positivos = []
 
 parametros = len(sys.argv)
 
-entradaTreinamento = sys.argv[0]
-entradaTestes = parametros == 1 ? False : sys.argv[0]
+if parametros != 4 and parametros != 7:
+  print "Número de parâmetros inválidos!"
+  print "Você está utilizando o script 'analisa.sh' para executar?"
+  print "-----------------------------------"
+  print "Existe dois modos de executar o programa:"
+  print "  1) Somente arquivo de treinamento"
+  print "  2) Arquivos de treinamento e testes"
+  print "\n----------------------------------"
+  print "Abra o arquivo 'analisa.sh' e modifique os parâmetros para executar de forma correta e mais fácil o programa"
+  print "Após configurar as variáveis de acordo, execute em um terminal:"
+  print "  ./analisa.sh"
+  sys.exit()
 
-with open(entradaTreinamento, "r") as f:
-  dicionario = []
+treinamento_arquivo = sys.argv[1]
+treinamento_campo_texto = int(sys.argv[2])
+treinamento_campo_classe = int(sys.argv[3])
+testes_arquivo = False
 
-  leitor = csv.reader(f, delimiter=',', quotechar='"')
+if parametros == 7:
+  testes_arquivo = sys.argv[4]
+  testes_campo_texto = sys.argv[5]
+  testes_campo_classe = sys.argv[6]
 
-  for line in leitor:
-    texto = line[5]
-    polaridade = line[6]
+treinamento = extrai_features(treinamento_arquivo, treinamento_campo_texto, treinamento_campo_classe)
 
-    texto = pre_processa_texto(texto)
-
-    if polaridade == "-1":
-      tweets_negativos.append(texto)
-    else:
-      tweets_positivos.append(texto)
-
-posFeatures = []
-negFeatures = []
-
-for tweet in tweets_positivos:
-  posFeatures.append([make_full_dict(tweet), 'pos'])
-for tweet in tweets_negativos:
-  negFeatures.append([make_full_dict(tweet.split(" ")), 'neg'])
-
-random.shuffle(posFeatures)
-random.shuffle(negFeatures)
-
-if entradaTestes:
-
+if testes_arquivo:
+  teste = extrai_features(testes_arquivo, testes_campo_texto, testes_campo_classe)
+  tmp = classifica_arquivo_separado(treinamento[0], treinamento[1], teste[0] + teste[1])
 else:
-posCutoff = int(math.floor(len(posFeatures)*3/4))
-negCutoff = int(math.floor(len(negFeatures)*3/4))
-trainFeatures = posFeatures[:posCutoff] + negFeatures[:negCutoff]
-testFeatures = posFeatures[posCutoff:] + negFeatures[negCutoff:]
+  tmp = classifica_mesmo_arquivo(treinamento[0], treinamento[1])
 
-classifier = NaiveBayesClassifier.train(trainFeatures)
+classifier = tmp["classifier"]
+referenceSets = tmp["ref"]
+testSets = tmp["test"]
 
-#initiates referenceSets and testSets
-referenceSets = collections.defaultdict(set)
-testSets = collections.defaultdict(set)
-
-#puts correctly labeled sentences in referenceSets and the predictively labeled version in testsets
-for i, (features, label) in enumerate(testFeatures):
-  referenceSets[label].add(i)
-  predicted = classifier.classify(features)
-  testSets[predicted].add(i)
-
-print 'train on %d instances, test on %d instances' % (len(trainFeatures), len(testFeatures))
 # print 'accuracy:', accuracy(classifier, testFeatures)
 print 'pos precision:', precision(referenceSets['pos'], testSets['pos'])
 print 'pos recall:', recall(referenceSets['pos'], testSets['pos'])
