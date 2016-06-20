@@ -6,9 +6,6 @@ import nltk, nltk.classify.util
 from nltk.metrics import *
 from nltk.classify import NaiveBayesClassifier
 import csv
-import itertools
-from nltk.collocations import BigramCollocationFinder
-from nltk.metrics import BigramAssocMeasures
 import random
 
 def classifica(trainFeatures, testFeatures):
@@ -74,9 +71,9 @@ def extrai_features(arquivo, campo_texto, campo_classe):
   negFeatures = []
 
   for tweet in tweets_positivos:
-    posFeatures.append([make_full_dict(tweet.split(" ")), 'pos'])
+    posFeatures.append([prepara_features_classificador(tweet.split(" ")), 'pos'])
   for tweet in tweets_negativos:
-    negFeatures.append([make_full_dict(tweet.split(" ")), 'neg'])
+    negFeatures.append([prepara_features_classificador(tweet.split(" ")), 'neg'])
 
   random.shuffle(posFeatures)
   random.shuffle(negFeatures)
@@ -131,13 +128,8 @@ def is_emoticon(palavra):
 
   return 0
 
-def make_full_dict(words):
+def prepara_features_classificador(words):
   return dict([(word, True) for word in words])
-
-def bigram_word_feats(words, score_fn=BigramAssocMeasures.chi_sq, n=200):
-    bigram_finder = BigramCollocationFinder.from_words(words)
-    bigrams = bigram_finder.nbest(score_fn, n)
-    return dict([(ngram, True) for ngram in itertools.chain(words, bigrams)])
 
 def substitui_abreviacoes_internet(palavra):
     dic = [
@@ -212,8 +204,8 @@ testes_arquivo = False
 
 if parametros == 7:
   testes_arquivo = sys.argv[4]
-  testes_campo_texto = sys.argv[5]
-  testes_campo_classe = sys.argv[6]
+  testes_campo_texto = int(sys.argv[5])
+  testes_campo_classe = int(sys.argv[6])
 
 treinamento = extrai_features(treinamento_arquivo, treinamento_campo_texto, treinamento_campo_classe)
 
