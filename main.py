@@ -1,5 +1,6 @@
 # coding=utf-8
 
+# import __future__ import print_function, unicode_literals
 import sys
 import re, math, collections, itertools
 import nltk, nltk.classify.util
@@ -14,12 +15,31 @@ def classifica(trainFeatures, testFeatures):
   #initiates referenceSets and testSets
   referenceSets = collections.defaultdict(set)
   testSets = collections.defaultdict(set)
+  vp = 0
+  fp = 0
+  vn = 0
+  fn = 0
+
 
   #puts correctly labeled sentences in referenceSets and the predictively labeled version in testsets
   for i, (features, label) in enumerate(testFeatures):
     referenceSets[label].add(i)
     predicted = classifier.classify(features)
     testSets[predicted].add(i)
+
+    if label == "pos" and predicted == "pos":
+      vp = vp + 1
+    elif label == "pos" and predicted == "neg":
+      fn = fn + 1
+    elif label == "neg" and predicted == "neg":
+      vn = vn + 1
+    elif label == "neg" and predicted == "pos":
+      fp = fp + 1
+
+  print "fp: ", fp
+  print "vp: ", vp
+  print "fn: ", fn
+  print "vn: ",  vn
 
   return {
     "classifier": classifier,
@@ -34,19 +54,21 @@ def classifica_arquivo_separado(features_positivas, features_negativas, testes):
   return classifica(trainFeatures, testFeatures)
 
 def classifica_mesmo_arquivo(features_positivas, features_negativas):
-  posCutoff = int(math.floor(len(features_positivas)*3/4))
-  negCutoff = int(math.floor(len(features_negativas)*3/4))
+  posCutoff = int( math.floor( len(features_positivas)*3/4 ) )
+  negCutoff = int( math.floor( len(features_negativas)*3/4 ) )
+
   trainFeatures = features_positivas[:posCutoff] + features_negativas[:negCutoff]
   testFeatures = features_positivas[posCutoff:] + features_negativas[negCutoff:]
 
   return classifica(trainFeatures, testFeatures)
 
 def is_url(texto):
-  ocorrencias = re.findall('http[s]?:[/]*(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', texto)
+  #facepalm
+  ocorrencias = re.findall('http', texto)
   return len(ocorrencias) > 0
 
 def remove_pontuacao(palavra):
-  return re.sub('[\.,;\\\/"\']', '', palavra)
+  return re.sub('[\.,;?:\\\/"\'\(\)\[\]\{\}]', '', palavra)
 
 def is_emoji(palavra):
   ocorrencias = re.findall(':[a-zA-Z]+:', palavra)
@@ -61,19 +83,23 @@ def extrai_features(arquivo, campo_texto, campo_classe):
       polaridade = line[campo_classe]
 
       texto = pre_processa_texto(texto)
-
-      if polaridade == "-1":
-        tweets_negativos.append(texto)
-      else:
+      if polaridade == "1":
         tweets_positivos.append(texto)
+      else:
+        tweets_negativos.append(texto)
 
   posFeatures = []
   negFeatures = []
 
   for tweet in tweets_positivos:
-    posFeatures.append([prepara_features_classificador(tweet.split(" ")), 'pos'])
+    palavras = tweet.split(" ")
+    print palavras
+    posFeatures.append([prepara_features_classificador(palavras), 'pos'])
+  print "\n\n------------------------------\n\n"
   for tweet in tweets_negativos:
-    negFeatures.append([prepara_features_classificador(tweet.split(" ")), 'neg'])
+    palavras = tweet.split(" ")
+    print palavras
+    negFeatures.append([prepara_features_classificador(palavras), 'neg'])
 
   random.shuffle(posFeatures)
   random.shuffle(negFeatures)
@@ -90,7 +116,34 @@ def is_emoticon(palavra):
     ":P",
     "*-*",
     "*.*",
-    ";p"
+    ";p",
+    ":^B",
+    ":^D",
+    ":^B",
+    "=B",
+    "=^B",
+    "=^D",
+    ":’)"
+    ":’]",
+    ":’}",
+    ";]",
+    ";}",
+    ":-p",
+    ":-P",
+    ":-b",
+    ":^p",
+    ":^P",
+    ":^b",
+    "=P",
+    "=p",
+    ":P",
+    ":p",
+    ":b",
+    "=b",
+    "=^p",
+    " =^P",
+    "=^b",
+    "\o/"
   ]
 
   emoticons_neg = [
@@ -107,7 +160,82 @@ def is_emoticon(palavra):
     ":/",
     ":s",
     ":S",
-    ":@"
+    ":@",
+    ":|",
+    "=|",
+    ":-|",
+    ">.<",
+    "><",
+    ">_<",
+    ":o",
+    ":0",
+    "=O",
+    ":@",
+    "=@",
+    ":^o",
+    ":^@",
+    "-.-",
+    "-.-’",
+    "-_-",
+    "-_-’",
+    ":x",
+    "=X",
+    "=#",
+    ":-x",
+    ":-@",
+    ":-#",
+    ":^x",
+    ":^#",
+    ":#",
+    "D:",
+    "D=",
+    "D-:",
+    "D^:",
+    "D^=",
+    ":(",
+    ":[",
+    ":{",
+    ":o(",
+    ":o[",
+    ":^(",
+    ":^[",
+    ":^{",
+    "=^(",
+    "=^{",
+    ">=(",
+    ">=[",
+    ">={",
+    ">=(",
+    ">:-{",
+    ">:-[",
+    ">:-(",
+    ">=^[",
+    ">:-(",
+    ":-[",
+    ":-(",
+    "=(",
+    "=[",
+    "={",
+    "=^[",
+    ">:-=(",
+    ">=[",
+    ":’(",
+    ":’[",
+    ":’{",
+    "=’{",
+    "=’(",
+    "=’[",
+    "=/",
+    ":/",
+    "=$",
+    "o.O",
+    "O_o",
+    "Oo",
+    ":$:-{",
+    ">:-{",
+    ">=^(",
+    ">=^{",
+    ":o{"
   ]
 
   emoticons_neu = [
@@ -117,7 +245,33 @@ def is_emoticon(palavra):
     "O.o",
     "Oo",
     ":o",
-    ":O"
+    ":O",
+    ":|",
+    "=|",
+    ":-|",
+    ">.<",
+    "><",
+    ">_<",
+    ":o",
+    ":0",
+    "=O",
+    ":^@",
+    "=@",
+    ":^o",
+    ":^@",
+    "-.-",
+    "-.-’",
+    "-_-",
+    "-_-’",
+    ":^x",
+    "=X",
+    "=#",
+    ":-x",
+    ":-@",
+    ":-#",
+    ":^x",
+    ":^#",
+    ":#"
   ]
 
   if palavra in emoticons_pos:
@@ -158,22 +312,62 @@ def substitui_abreviacoes_internet(palavra):
 
     return encontrou[0]
 
+def palavra_neutra(palavra):
+  palavras = [
+    "o",
+    "a",
+    "os",
+    "as",
+    "de",
+    "às",
+    "das",
+    "dos",
+    "do",
+    "da",
+    "com",
+    "sem",
+    "no",
+    "na",
+    "nos",
+    "nas",
+    "em",
+    "e",
+    "um",
+    "uma",
+    "uns",
+    "que",
+    "num"
+  ]
+
+  return palavra in palavras
+
 def pre_processa_texto(texto):
   novo_texto = []
 
   for palavra in texto.split(" "):
-    palavra = remove_pontuacao(palavra).strip()
+    palavra = remove_pontuacao(palavra).strip().lower()
 
     if len(palavra) < 1:
       continue
 
     if palavra[0] == "@":
       continue
-
-    if is_url(palavra) or is_emoticon(palavra) or is_emoji(palavra):
+    
+    if palavra[0] == "#":
       continue
 
-    t = substitui_abreviacoes_internet(palavra)
+    if is_url(palavra):
+      continue
+    if  is_emoticon(palavra) or is_emoji(palavra):
+      continue
+
+    if palavra_neutra(palavra):
+      continue
+
+    t = palavra
+
+    if len(palavra) < 7:
+      t = substitui_abreviacoes_internet(palavra)
 
     novo_texto.append(t)
 
