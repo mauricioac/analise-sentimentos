@@ -9,6 +9,8 @@ from nltk.classify import NaiveBayesClassifier
 import csv
 import random
 
+verbos = []
+
 def classifica(trainFeatures, testFeatures):
   classifier = NaiveBayesClassifier.train(trainFeatures)
 
@@ -70,6 +72,23 @@ def is_url(texto):
 def remove_pontuacao(palavra):
   return re.sub('[\.,;?:\\\/"\'\(\)\[\]\{\}]', '', palavra)
 
+def lematiza(palavra):
+  sufixo = [
+    ("endo", "er"),
+    ("indo", "ir"),
+    ("ando", "ar")
+  ]
+
+  for x in sufixo:
+    if palavra.endswith(x[0]):
+      nova_palavra = re.sub(x[0],x[1],palavra)
+      
+      if nova_palavra in verbos:
+        print palavra, nova_palavra
+        return nova_palavra
+
+  return palavra
+
 def is_emoji(palavra):
   ocorrencias = re.findall(':[a-zA-Z]+:', palavra)
   return len(ocorrencias) > 0
@@ -93,12 +112,12 @@ def extrai_features(arquivo, campo_texto, campo_classe):
 
   for tweet in tweets_positivos:
     palavras = tweet.split(" ")
-    print palavras
+    # print palavras
     posFeatures.append([prepara_features_classificador(palavras), 'pos'])
-  print "\n\n------------------------------\n\n"
+  # print "\n\n------------------------------\n\n"
   for tweet in tweets_negativos:
     palavras = tweet.split(" ")
-    print palavras
+    # print palavras
     negFeatures.append([prepara_features_classificador(palavras), 'neg'])
 
   random.shuffle(posFeatures)
@@ -556,10 +575,14 @@ def pre_processa_texto(texto):
 
     if len(palavra) < 7:
       t = substitui_abreviacoes_internet(palavra)
-
+    t = lematiza(t)
     novo_texto.append(t)
 
   return " ".join(novo_texto)
+
+with open("verbos.txt", "r") as f:
+  for palavra in f:
+    verbos.append(palavra.strip())
 
 tweets_negativos = []
 tweets_positivos = []
