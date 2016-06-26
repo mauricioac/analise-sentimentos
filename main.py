@@ -70,22 +70,56 @@ def is_url(texto):
   return len(ocorrencias) > 0
 
 def remove_pontuacao(palavra):
-  return re.sub('[\.,;?:\\\/"\'\(\)\[\]\{\}]', '', palavra)
+  return re.sub('[\.,;?:+*&$=º~^\\\/"\'\(\)\[\]\{\}]', '', palavra)
 
 def lematiza(palavra):
-  sufixo = [
+  sufixo_verbos = [
     ("endo", "er"),
     ("indo", "ir"),
-    ("ando", "ar")
+    ("ando", "ar"),
+    ("emos", "er"),
+    ("eis", "er"),
+    ("eríamos", "er"),
+    ("aríamos","ar"),
+    ("iamos","ir"),
+    ("eira","er"),
+    ("esse", "er"),
+    ("asse","ar"),
+    ("isse","ir"),
+    ("essem", "er"),
+    ("assem","ar"),
+    ("issem","ir"),
+    ("arem","ar"),
+    ("erem","er"),
+    ("irem","ir"),
+    ("ásseis","ar"),
+    ("éssemos", "er"),
+    ("s", "")
   ]
 
-  for x in sufixo:
+  sufixo_outros = [
+    ("zinhos", ""),
+    ("zinho", ""),
+    ("zinhas", ""),
+    ("zinha", ""),
+    ("zito", ""),
+    ("zitos", ""),
+    ("zinha", ""),
+    ("zinha", "")
+  ]
+
+  for x in sufixo_verbos:
     if palavra.endswith(x[0]):
       nova_palavra = re.sub(x[0],x[1],palavra)
       
       if nova_palavra in verbos:
-        print palavra, nova_palavra
         return nova_palavra
+
+  for x in sufixo_outros:
+    if palavra.endswith(x[0]):
+      nova_palavra = re.sub(x[0],x[1],palavra)
+      print palavra, nova_palavra
+      return nova_palavra
 
   return palavra
 
@@ -576,6 +610,12 @@ def pre_processa_texto(texto):
     if len(palavra) < 7:
       t = substitui_abreviacoes_internet(palavra)
     t = lematiza(t)
+
+    t = t.strip()
+
+    if len(palavra) < 1:
+      continue
+
     novo_texto.append(t)
 
   return " ".join(novo_texto)
