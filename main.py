@@ -1,6 +1,5 @@
 # coding=utf-8
 
-# import __future__ import print_function, unicode_literals
 import sys
 import re, math, collections, itertools
 import nltk, nltk.classify.util
@@ -12,52 +11,44 @@ import random
 verbos = []
 
 def classifica(trainFeatures, testFeatures):
+  #faz treinamento e retorna classificador treinado
   classifier = NaiveBayesClassifier.train(trainFeatures)
 
-  #initiates referenceSets and testSets
-  referenceSets = collections.defaultdict(set)
-  testSets = collections.defaultdict(set)
-  vp = 0
-  fp = 0
-  vn = 0
-  fn = 0
+  dados_de_referencia = collections.defaultdict(set)
+  dados_de_teste = collections.defaultdict(set)
+  # vp = 0
+  # fp = 0
+  # vn = 0
+  # fn = 0
 
-
-  #puts correctly labeled sentences in referenceSets and the predictively labeled version in testsets
   for i, (features, label) in enumerate(testFeatures):
-    referenceSets[label].add(i)
+    dados_de_referencia[label].add(i)
     predicted = classifier.classify(features)
-    testSets[predicted].add(i)
+    dados_de_teste[predicted].add(i)
 
-    if label == "pos" and predicted == "pos":
-      vp = vp + 1
-    elif label == "pos" and predicted == "neg":
-      fn = fn + 1
-    elif label == "neg" and predicted == "neg":
-      vn = vn + 1
-    elif label == "neg" and predicted == "pos":
-      fp = fp + 1
-
-  print "fp: ", fp
-  print "vp: ", vp
-  print "fn: ", fn
-  print "vn: ",  vn
-
+    # if label == "pos" and predicted == "pos":
+    #   vp = vp + 1
+    # elif label == "pos" and predicted == "neg":
+    #   fn = fn + 1
+    # elif label == "neg" and predicted == "neg":
+    #   vn = vn + 1
+    # elif label == "neg" and predicted == "pos":
+    #   fp = fp + 1
   return {
     "classifier": classifier,
-    "ref": referenceSets,
-    "test": testSets
+    "ref": dados_de_referencia,
+    "test": dados_de_teste
   }
 
 def classifica_arquivo_separado(features_positivas, features_negativas, testes):
   trainFeatures = features_negativas + features_positivas
-  testFeatures = testes
 
-  return classifica(trainFeatures, testFeatures)
+  return classifica(trainFeatures, testes)
 
 def classifica_mesmo_arquivo(features_positivas, features_negativas):
-  posCutoff = int( math.floor( len(features_positivas)*1/4 ) )
-  negCutoff = int( math.floor( len(features_negativas)*1/4 ) )
+  #calcula o ponto de corte
+  posCutoff = int( math.floor( len(features_positivas)*3/4 ) )
+  negCutoff = int( math.floor( len(features_negativas)*3/4 ) )
 
   trainFeatures = features_positivas[:posCutoff] + features_negativas[:negCutoff]
   testFeatures = features_positivas[posCutoff:] + features_negativas[negCutoff:]
@@ -65,12 +56,11 @@ def classifica_mesmo_arquivo(features_positivas, features_negativas):
   return classifica(trainFeatures, testFeatures)
 
 def is_url(texto):
-  #facepalm
   ocorrencias = re.findall('http', texto)
   return len(ocorrencias) > 0
 
 def remove_pontuacao(palavra):
-  return re.sub('[\.,;?:+*&$=º~^\\\/"\'\(\)\[\]\{\}]\t', '', palavra)
+  return re.sub('[\.,;?:+*&$=º~^\\\/"\'\(\)\[\]\{\}]\t\n', '', palavra)
 
 def lematiza(palavra):
   sufixo_verbos = [
@@ -131,7 +121,6 @@ def lematiza(palavra):
   for x in sufixo_outros:
     if palavra.endswith(x[0]):
       nova_palavra = re.sub(x[0],x[1],palavra)
-      print palavra, nova_palavra
       return nova_palavra
 
   return palavra
@@ -141,14 +130,17 @@ def is_emoji(palavra):
   return len(ocorrencias) > 0
 
 def extrai_features(arquivo, campo_texto, campo_classe):
+  #abre arquivo e instancia um leitor de  csv
   with open(arquivo, "r") as f:
     leitor = csv.reader(f, delimiter=',', quotechar='"')
 
     for line in leitor:
       texto = line[campo_texto]
+      #polaridade = positivo ou negativo
       polaridade = line[campo_classe]
 
       texto = pre_processa_texto(texto)
+      #separa em tweets positivos e negativos
       if polaridade == "1":
         tweets_positivos.append(texto)
       else:
@@ -157,9 +149,10 @@ def extrai_features(arquivo, campo_texto, campo_classe):
   posFeatures = []
   negFeatures = []
 
+  #para cada tweet é construido o formato do Naive Bayes
   for tweet in tweets_positivos:
     palavras = tweet.split(" ")
-    # print palavras
+    # vetor com features na posição 0 e a classe na última posição
     posFeatures.append([prepara_features_classificador(palavras), 'pos'])
   # print "\n\n------------------------------\n\n"
   for tweet in tweets_negativos:
@@ -348,6 +341,7 @@ def is_emoticon(palavra):
 
   return 0
 
+#Monta um dicionário de palavras
 def prepara_features_classificador(words):
   return dict([(word, True) for word in words])
 
@@ -633,6 +627,7 @@ def pre_processa_texto(texto):
 
   return " ".join(novo_texto)
 
+#le lista de verbos de arquivo externo
 with open("verbos.txt", "r") as f:
   for palavra in f:
     verbos.append(palavra.strip())
@@ -642,6 +637,7 @@ tweets_positivos = []
 
 parametros = len(sys.argv)
 
+#mensagem de erro, com indicações de como executar o programa
 if parametros != 4 and parametros != 7:
   print "Número de parâmetros inválidos!"
   print "Você está utilizando o script 'analisa.sh' para executar?"
@@ -655,33 +651,41 @@ if parametros != 4 and parametros != 7:
   print "  ./analisa.sh"
   sys.exit()
 
+#nome do arquivo de treinamento
 treinamento_arquivo = sys.argv[1]
+#qual o campo do csv que vai usar como texto/mensagem
 treinamento_campo_texto = int(sys.argv[2])
+#qual a classe (pos,neg)
 treinamento_campo_classe = int(sys.argv[3])
+#se vai ter arquivo de teste ou não
 testes_arquivo = False
 
+#se tem 7 parametros, significa que terá um arquivo de teste
 if parametros == 7:
   testes_arquivo = sys.argv[4]
   testes_campo_texto = int(sys.argv[5])
   testes_campo_classe = int(sys.argv[6])
 
+#extrai features de treinamento do arquivo, monta os dados de treinamento para o Naive Bayes
 treinamento = extrai_features(treinamento_arquivo, treinamento_campo_texto, treinamento_campo_classe)
 
+
 if testes_arquivo:
+  #se tem arquivo de teste extrai as features do arquivo de teste
   teste = extrai_features(testes_arquivo, testes_campo_texto, testes_campo_classe)
+  #features positivas, features negativas, e o teste
   tmp = classifica_arquivo_separado(treinamento[0], treinamento[1], teste[0] + teste[1])
 else:
+  #tmp retorna os dados de classificação, e o classificador
   tmp = classifica_mesmo_arquivo(treinamento[0], treinamento[1])
 
 classifier = tmp["classifier"]
-referenceSets = tmp["ref"]
-testSets = tmp["test"]
+dados_de_referencia = tmp["ref"]
+dados_de_teste = tmp["test"]
 
-# print 'accuracy:', accuracy(classifier, testFeatures)
-print 'pos precision:', precision(referenceSets['pos'], testSets['pos'])
-print 'pos recall:', recall(referenceSets['pos'], testSets['pos'])
-print 'pos F-measure:', f_measure(referenceSets['pos'], testSets['pos'])
-print 'neg precision:', precision(referenceSets['neg'], testSets['neg'])
-print 'neg recall:', recall(referenceSets['neg'], testSets['neg'])
-print 'neg F-measure:', f_measure(referenceSets['neg'], testSets['neg'])
-classifier.show_most_informative_features(10)
+print 'precisão positiva:', precision(dados_de_referencia['pos'], dados_de_teste['pos'])
+print 'revocação positiva:', recall(dados_de_referencia['pos'], dados_de_teste['pos'])
+print 'F-measure positivo:', f_measure(dados_de_referencia['pos'], dados_de_teste['pos'])
+print 'precisão negativa:', precision(dados_de_referencia['neg'], dados_de_teste['neg'])
+print 'revocação negativa:', recall(dados_de_referencia['neg'], dados_de_teste['neg'])
+print 'F-measure negativo:', f_measure(dados_de_referencia['neg'], dados_de_teste['neg'])
