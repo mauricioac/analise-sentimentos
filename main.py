@@ -70,10 +70,19 @@ def is_url(texto):
   return len(ocorrencias) > 0
 
 def remove_pontuacao(palavra):
-  return re.sub('[\.,;?:+*&$=º~^\\\/"\'\(\)\[\]\{\}]', '', palavra)
+  return re.sub('[\.,;?:+*&$=º~^\\\/"\'\(\)\[\]\{\}]\t', '', palavra)
 
 def lematiza(palavra):
   sufixo_verbos = [
+    ("fosse","ir"),
+    ("desse", "dar"),
+    ("usesse","or"),
+    ("isesse","erer"),
+    ("oubesse", "aber"),
+    ("ouvesse","azar"),
+    ("ouxesse","azar"),
+    ("udesse","oder"),
+    ("isesse","erer"),
     ("endo", "er"),
     ("indo", "ir"),
     ("ando", "ar"),
@@ -84,6 +93,7 @@ def lematiza(palavra):
     ("iamos","ir"),
     ("eira","er"),
     ("esse", "er"),
+    ("remos","er"),
     ("asse","ar"),
     ("isse","ir"),
     ("essem", "er"),
@@ -94,6 +104,9 @@ def lematiza(palavra):
     ("irem","ir"),
     ("ásseis","ar"),
     ("éssemos", "er"),
+    ("a-lo", "ar"),
+    ("á-lo-íamos", "ar"),
+    ("ava","ar"),
     ("s", "")
   ]
 
